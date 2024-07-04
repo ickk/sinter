@@ -17,7 +17,7 @@ pub struct IStr(pub(super) &'static str);
 // # constructors
 
 macro_rules! intern_doc {() => {
-r"Intern a new string, or return the extant [`IStr`] is one exists
+r"Intern a new string, or return the extant [`IStr`] if one exists
 
 This operation may be slow, depending on whether the string has been previously
 interned."
@@ -31,8 +31,8 @@ pub fn intern(s: &str) -> IStr {
 /// Locklessly find an extant [`IStr`] corresponding to the string given, if
 /// one exists
 ///
-/// Call this to find out if a string has already been interned,
-/// without newly interning it if not.
+/// Call this to find out if a string has already been interned, without newly
+/// interning it if not.
 #[inline]
 pub fn get_interned(s: &str) -> Option<IStr> {
   crate::internal::THE_INTERNER.get_interned(s)

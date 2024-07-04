@@ -25,7 +25,7 @@ required, and may require allocating a new memory page for the pool.
 
 Zero-cost conversion to `&'static str` or `&'static CStr`:
 ```rust
-# use sinter::{intern, IStr};
+# use sinter::IStr;
 # use ::core::ffi::CStr;
 let istr = IStr::new("hello, sinter!");
 let s: &'static str = istr.as_str();
@@ -34,9 +34,9 @@ let cstr: &'static CStr = istr.as_c_str();
 
 [`IStr`] Derefs to `&str`:
 ```rust
-# use sinter::{intern, IStr};
+# use sinter::IStr;
 # use ::core::ffi::CStr;
-let istr: IStr = intern("hello, sinter!");
+let istr = IStr::new("hello, sinter!");
 let s: &str = &*istr;
 ```
 
@@ -106,7 +106,7 @@ The [`::core::borrow::Borrow<str>`] implementation lets you create `HashMap`s
 with `IStr` keys, and then ergonomically lookup values with `&str`:
 ```rust
 # use sinter::IStr;
-# use std::collections::HashMap;
+# use ::std::collections::HashMap;
 let mut map: HashMap<IStr, f32> = HashMap::new();
 map.insert(IStr::new("e"), 2.718);
 let val = map.get("e");

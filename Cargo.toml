@@ -1,12 +1,12 @@
 [package]
 name = "sinter"
-version = "0.0.0"
+version = "0.1.0"
 edition = "2021"
 authors = ["ickk <crates@ickk.io>"]
 license = "MIT OR Apache-2.0 OR Zlib"
 readme = "README.md"
 include = ["src/", "LICENSE-APACHE", "LICENSE-MIT", "LICENSE-ZLIB"]
-description = "Global thread-safe string interner "
+description = "Global thread-safe string interner"
 documentation = "https://docs.rs/sinter"
 repository = "https://github.com/ickk/sinter/"
 keywords = ["interner", "string"]

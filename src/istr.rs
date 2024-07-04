@@ -128,7 +128,7 @@ impl AsRef<CStr> for IStr {
 impl Borrow<str> for IStr {
   #[inline]
   fn borrow(&self) -> &'static str {
-    &self.0
+    self.0
   }
 }
 

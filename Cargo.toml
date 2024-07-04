@@ -1,0 +1,18 @@
+[package]
+name = "sinter"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+hashbrown = { version = "0.14", default-features = false }
+parking_lot = { version = "0.12", default-features = false }
+wyhash = { version = "0.5", default-features = false }
+
+[lints]
+rust.unsafe_op_in_unsafe_fn = "deny"
+clippy.new_without_default = "allow"
+clippy.toplevel_ref_arg = "allow"
+clippy.too_many_arguments = "allow"
+clippy.match_ref_pats = "allow"
+clippy.needless_return = "allow"

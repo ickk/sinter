@@ -154,11 +154,11 @@ The concurrency scheme is as follows:
    pointer before starting a new read.
 
 3. When a thread terminates it calls the destructor for the `LocalKey` which
-   contains a pointer to our epic atomic-counter. In this destructor we set the
-   value of the epic to a special value (`0`) to mark this thread as dead.
+   contains a pointer to our epoch atomic-counter. In this destructor we set
+   the value of the epoch to a special value (`0`) to mark this thread as dead.
    Later when some other code is holding the write_lock on the interner, it
-   checks the list of epics to see if any threads are dead, and then frees the
-   memory holding the atomic and removes that epic from Interner's list.
+   checks the list of epochs to see if any threads are dead, and then frees the
+   memory holding the atomic and removes that epoch from Interner's list.
 
    This solves the small memory leak and degradation of performance that can
    happen if the user keeps spawning lots of temporary threads, without

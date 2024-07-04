@@ -19,29 +19,29 @@ use {
 pub(crate) static THE_INTERNER: Interner = Interner::new();
 
 thread_local! {
-  /// This is an epic counter for the current thread. It allows the writer to
+  /// This is an epoch counter for the current thread. It allows the writer to
   /// reliably wait on outstanding reads from id_map_mut
-  static LOCAL_EPIC: Cell<LocalEpic> = const { Cell::new(LocalEpic::None) };
+  static LOCAL_EPOCH: Cell<LocalEpoch> = const { Cell::new(LocalEpoch::None) };
 }
-/// Local epic counter starting value
-const LOCAL_EPIC_INIT: usize = 2;
-/// Local epic counter gets assigned this value when the thread terminates,
+/// Local epoch counter starting value
+const LOCAL_EPOCH_INIT: usize = 2;
+/// Local epoch counter gets assigned this value when the thread terminates,
 /// effectively transferring ownership of the atomic to the Interner
-const LOCAL_EPIC_DEAD: usize = 0;
+const LOCAL_EPOCH_DEAD: usize = 0;
 
 #[derive(Debug, Clone)]
-enum LocalEpic {
+enum LocalEpoch {
   Some(ptr::NonNull<AtomicUsize>),
   None,
 }
 
-impl Drop for LocalEpic {
+impl Drop for LocalEpoch {
   fn drop(&mut self) {
-    if let LocalEpic::Some(ptr) = self {
-      let epic = unsafe { ptr.as_ref() };
+    if let LocalEpoch::Some(ptr) = self {
+      let epoch = unsafe { ptr.as_ref() };
       // mark this counter as dead, so that the Interner can clean it its
       // memory.
-      epic.store(LOCAL_EPIC_DEAD, Ordering::Relaxed)
+      epoch.store(LOCAL_EPOCH_DEAD, Ordering::Relaxed)
     }
   }
 }
@@ -53,7 +53,7 @@ unsafe impl Sync for Interner {}
 /// A thread-safe global string interner
 pub(crate) struct Interner {
   /// freely readable* hashtable of `&str`s to unique `IStr`s
-  /// readers must (atomically) increment their epic before and after reading
+  /// readers must (atomically) increment their epoch before and after reading
   id_map: AtomicPtr<HashTable<IStr>>,
 
   /// reading/writing of all following fields is protected by this lock
@@ -66,7 +66,7 @@ pub(crate) struct Interner {
   last_memory_index: AtomicU32,
 
   /// The writer's (must have lock) version of the id_map.
-  /// Additionally must wait on readers to depart (using epic counters)
+  /// Additionally must wait on readers to depart (using epoch counters)
   /// atomically swapped with id_map by the writer.
   id_map_mut: AtomicPtr<HashTable<IStr>>,
 
@@ -74,11 +74,11 @@ pub(crate) struct Interner {
   /// to the other map)
   pending_add: Cell<Option<IStr>>,
 
-  /// references to epic counters for each thread. Even counters indicate no
+  /// references to epoch counters for each thread. Even counters indicate no
   /// reads are happening. Odd counters indicate reads map be happening.
   /// The writer can wait until odd counters increment by at least 1, to be
   /// sure there are no lingering reads on its copy.
-  epics: UnsafeCell<Vec<(thread::ThreadId, ptr::NonNull<AtomicUsize>)>>,
+  epochs: UnsafeCell<Vec<(thread::ThreadId, ptr::NonNull<AtomicUsize>)>>,
 }
 
 pub(crate) const WYHASH_SEED: u64 = 0;
@@ -94,7 +94,7 @@ impl Interner {
       id_map: AtomicPtr::new(ptr::null_mut()),
       id_map_mut: AtomicPtr::new(ptr::null_mut()),
       pending_add: Cell::new(None),
-      epics: UnsafeCell::new(Vec::new()),
+      epochs: UnsafeCell::new(Vec::new()),
     }
   }
 
@@ -112,9 +112,9 @@ impl Interner {
   where
     B: iter::FromIterator<IStr>,
   {
-    let local_epic = self.local_epic_or_init();
+    let local_epoch = self.local_epoch_or_init();
 
-    local_epic.fetch_add(1, Ordering::Release);
+    local_epoch.fetch_add(1, Ordering::Release);
     let ret = 'reading: {
       let id_map = self.id_map.load(Ordering::Acquire);
       if !id_map.is_null() {
@@ -124,7 +124,7 @@ impl Interner {
         break 'reading B::from_iter(iter::empty());
       }
     };
-    local_epic.fetch_add(1, Ordering::Release);
+    local_epoch.fetch_add(1, Ordering::Release);
 
     ret
   }
@@ -133,17 +133,17 @@ impl Interner {
   /// one exists. Also returns the length of the id_map.
   ///
   /// caveat: not technically lockless if this is the first call to the
-  /// interner for this thread (see `Interner::local_epic_or_init`).
+  /// interner for this thread (see `Interner::local_epoch_or_init`).
   #[inline]
   fn get_interned_and_map_len(
     &'static self,
     s: &str,
     s_wyhash: u64,
   ) -> (Option<IStr>, usize) {
-    let local_epic = self.local_epic_or_init();
+    let local_epoch = self.local_epoch_or_init();
     let mut id_map_len = 0;
     // search among the existing Ids in the map
-    local_epic.fetch_add(1, Ordering::Release);
+    local_epoch.fetch_add(1, Ordering::Release);
     let ret = 'reading: {
       let id_map = self.id_map.load(Ordering::Acquire);
       if !id_map.is_null() {
@@ -156,38 +156,39 @@ impl Interner {
       }
       None
     };
-    local_epic.fetch_add(1, Ordering::Release);
+    local_epoch.fetch_add(1, Ordering::Release);
 
     (ret, id_map_len)
   }
 
   /// local thread initialisation
   #[inline]
-  fn local_epic_or_init(&'static self) -> &AtomicUsize {
-    let local_epic = LOCAL_EPIC.with(|cell| {
+  fn local_epoch_or_init(&'static self) -> &AtomicUsize {
+    let local_epoch = LOCAL_EPOCH.with(|cell| {
       // Need to get a reference to the value in the cell, but it's not Copy
       // because we want the destructor to run when the thread terminates.
-      if let &LocalEpic::Some(ptr) = unsafe { &*cell.as_ptr() } {
+      if let &LocalEpoch::Some(ptr) = unsafe { &*cell.as_ptr() } {
         return unsafe { ptr.as_ref() };
       } else {
         let ptr =
-          Box::into_non_null(Box::new(AtomicUsize::new(LOCAL_EPIC_INIT)));
+          Box::into_non_null(Box::new(AtomicUsize::new(LOCAL_EPOCH_INIT)));
 
-        LOCAL_EPIC.set(LocalEpic::Some(ptr));
+        LOCAL_EPOCH.set(LocalEpoch::Some(ptr));
         self.write_lock.lock();
         '_holding_lock: {
-          let epics = unsafe { &mut *self.epics.get() };
+          let epochs = unsafe { &mut *self.epochs.get() };
 
-          // we prune the dead epics here, because we're holding the write_lock
-          // anyway, and besides we really only need to free them at all if
-          // we're creating a lot of threads and then throwing them away.
+          // we prune the dead epochs here, because we're holding the
+          // write_lock anyway, and besides we really only need to free them at
+          // all if we're creating a lot of threads and then throwing them
+          // away.
           // TODO: if this is too slow, we could have another pair of counters.
           // One to count the number of threads created, and another to count
           // the number of threads killed. Then we'd only bother to prune if
-          // the difference was greater than the number of epics in the vec.
-          Self::prune_dead_epics(epics);
+          // the difference was greater than the number of epochs in the vec.
+          Self::prune_dead_epochs(epochs);
 
-          epics.push((thread::current().id(), ptr));
+          epochs.push((thread::current().id(), ptr));
         }
         unsafe { self.write_lock.unlock() };
 
@@ -195,17 +196,17 @@ impl Interner {
       }
     });
 
-    local_epic
+    local_epoch
   }
 
-  /// frees and removes any epic with a value of `LOCAL_EPIC_DEAD`
+  /// frees and removes any epoch with a value of `LOCAL_EPOCH_DEAD`
   #[inline]
-  fn prune_dead_epics(
-    epics: &mut Vec<(thread::ThreadId, ptr::NonNull<AtomicUsize>)>,
+  fn prune_dead_epochs(
+    epochs: &mut Vec<(thread::ThreadId, ptr::NonNull<AtomicUsize>)>,
   ) {
-    epics.retain(|&(_thread_id, ptr)| {
-      let epic = unsafe { ptr.as_ref() };
-      if epic.load(Ordering::Acquire) == LOCAL_EPIC_DEAD {
+    epochs.retain(|&(_thread_id, ptr)| {
+      let epoch = unsafe { ptr.as_ref() };
+      if epoch.load(Ordering::Acquire) == LOCAL_EPOCH_DEAD {
         // free the memory for the atomic and remove this entry from the list
         let _ = unsafe { Box::from_non_null(ptr) };
         false
@@ -263,30 +264,30 @@ impl Interner {
       }
       let id_map_mut = unsafe { &mut *id_map_mut };
 
-      // iterate all odd epics until they're no longer odd (i.e. readers are
+      // iterate all odd epochs until they're no longer odd (i.e. readers are
       // done with this map)
       {
-        let epics = unsafe { &mut *self.epics.get() };
-        let all_epics = epics.iter().collect::<Vec<_>>();
+        let epochs = unsafe { &mut *self.epochs.get() };
+        let all_epochs = epochs.iter().collect::<Vec<_>>();
         // TODO remove this clone, cache a vec instead, use smallvec
-        let mut odd_epics = all_epics
+        let mut odd_epochs = all_epochs
           .iter()
           .enumerate()
-          .map(|(i, (thread_id, ptr_epic))| {
-            let e = unsafe { ptr_epic.as_ref() };
+          .map(|(i, (thread_id, ptr_epoch))| {
+            let e = unsafe { ptr_epoch.as_ref() };
             (i, thread_id, e.load(Ordering::Acquire))
           })
           .filter(|(_, _, e)| (e % 2) == 1)
           .collect::<Vec<_>>();
-        if odd_epics.is_empty() {
+        if odd_epochs.is_empty() {
           let mut spin = 0;
           loop {
-            odd_epics.retain(|&(i, _thread_id, old)| {
-              let epic_i = unsafe { epics[i].1.as_ref() };
-              let new = epic_i.load(Ordering::Relaxed);
+            odd_epochs.retain(|&(i, _thread_id, old)| {
+              let epoch_i = unsafe { epochs[i].1.as_ref() };
+              let new = epoch_i.load(Ordering::Relaxed);
               new == old
             });
-            if odd_epics.is_empty() {
+            if odd_epochs.is_empty() {
               break;
             }
             // TODO: improve this spin loop, exponential back-off, waiting on

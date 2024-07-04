@@ -1,5 +1,8 @@
 `sinter`
 ==========
+[crates.io](https://crates.io/crates/sinter) |
+[docs.rs](https://docs.rs/sinter) |
+[github](https://github.com/ickk/sinter)
 
 This crate exposes an interned string type, [`IStr`], through a fast
 thread-safe global interning pool.
@@ -162,3 +165,17 @@ The concurrency scheme is as follows:
    requiring that the LocalKey destructor waits until it can get the
    write_lock, and without leaving any dangling pointers in the Interner
    datastructure.
+
+License
+-------
+
+This crate is licensed under any of the
+[Apache license, Version 2.0](./LICENSE-APACHE),
+or the
+[MIT license](./LICENSE-MIT),
+or the
+[Zlib license](./LICENSE-ZLIB)
+at your option.
+
+Unless explicitly stated otherwise, any contributions you intentionally submit
+for inclusion in this work shall be licensed accordingly.

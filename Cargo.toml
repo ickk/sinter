@@ -2,7 +2,14 @@
 name = "sinter"
 version = "0.0.0"
 edition = "2021"
-publish = false
+authors = ["ickk <crates@ickk.io>"]
+license = "MIT OR Apache-2.0 OR Zlib"
+readme = "README.md"
+include = ["src/", "LICENSE-APACHE", "LICENSE-MIT", "LICENSE-ZLIB"]
+description = "Global thread-safe string interner "
+documentation = "https://docs.rs/sinter"
+repository = "https://github.com/ickk/sinter/"
+keywords = ["interner", "string"]
 
 [dependencies]
 hashbrown = { version = "0.14", default-features = false }

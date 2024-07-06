@@ -62,7 +62,7 @@ impl IStr {
   }
 }
 
-impl From<&'_ str> for IStr {
+impl From<&str> for IStr {
   #[doc = intern_doc!()]
   #[inline]
   fn from(s: &str) -> Self {
@@ -78,12 +78,20 @@ impl From<String> for IStr {
   }
 }
 
-impl TryFrom<&'_ CStr> for IStr {
+impl From<&String> for IStr {
+  #[doc = intern_doc!()]
+  #[inline]
+  fn from(s: &String) -> Self {
+    intern(s)
+  }
+}
+
+impl TryFrom<&CStr> for IStr {
   type Error = ::core::str::Utf8Error;
 
   #[doc = intern_doc!()]
   #[inline]
-  fn try_from(c: &'_ CStr) -> Result<Self, Self::Error> {
+  fn try_from(c: &CStr) -> Result<Self, Self::Error> {
     let s = c.to_str()?;
     Ok(intern(s))
   }
@@ -95,6 +103,17 @@ impl TryFrom<CString> for IStr {
   #[doc = intern_doc!()]
   #[inline]
   fn try_from(c: CString) -> Result<Self, Self::Error> {
+    let s = c.to_str()?;
+    Ok(intern(s))
+  }
+}
+
+impl TryFrom<&CString> for IStr {
+  type Error = ::core::str::Utf8Error;
+
+  #[doc = intern_doc!()]
+  #[inline]
+  fn try_from(c: &CString) -> Result<Self, Self::Error> {
     let s = c.to_str()?;
     Ok(intern(s))
   }

@@ -22,6 +22,33 @@ fn eq() {
 }
 
 #[test]
+fn constructors() {
+  let string: String = String::from("hello");
+  let ref_str: &str = &string;
+
+  let from_ref_str: IStr = IStr::from(ref_str);
+  let from_ref_string: IStr = IStr::from(&string);
+  let from_string: IStr = IStr::from(string);
+
+  let c_string: CString = CString::new("hello").unwrap();
+  let ref_c_str: &CStr = &c_string;
+
+  let try_from_ref_c_str: IStr = IStr::try_from(ref_c_str).unwrap();
+  let try_from_ref_c_string: IStr = IStr::try_from(&c_string).unwrap();
+  let try_from_c_string: IStr = IStr::try_from(c_string).unwrap();
+
+  let istr = IStr::new("hello");
+
+  assert_eq!(istr, from_ref_str);
+  assert_eq!(istr, from_ref_string);
+  assert_eq!(istr, from_string);
+
+  assert_eq!(istr, try_from_ref_c_str);
+  assert_eq!(istr, try_from_ref_c_string);
+  assert_eq!(istr, try_from_c_string);
+}
+
+#[test]
 fn partial_eq() {
   let hello_str: &str = "hello";
   let hello_string = String::from(hello_str);

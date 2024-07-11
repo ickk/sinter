@@ -197,7 +197,7 @@ fn concurrency() {
 
 #[test]
 fn wyhash() {
-  use crate::internal::WYHASH_SEED;
+  use crate::interner::WYHASH_SEED;
 
   let hello_world = IStr::new("hello, world!");
 

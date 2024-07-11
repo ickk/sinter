@@ -1,7 +1,7 @@
 #![doc = include_str!("../README.md")]
 
 mod ext;
-mod internal;
+mod interner;
 mod istr;
 #[cfg(any(test, doctest))]
 mod tests;

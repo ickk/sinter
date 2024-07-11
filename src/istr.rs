@@ -14,30 +14,6 @@ use {
 #[derive(Eq, Copy, Clone, PartialOrd, Ord)]
 pub struct IStr(pub(super) &'static str);
 
-// # constructors
-
-macro_rules! intern_doc {() => {
-r"Intern a new string, or return the extant [`IStr`] if one exists
-
-This operation may be slow, depending on whether the string has been previously
-interned."
-};}
-#[doc = intern_doc!()]
-#[inline]
-pub fn intern(s: &str) -> IStr {
-  crate::internal::THE_INTERNER.intern(s)
-}
-
-/// Locklessly find an extant [`IStr`] corresponding to the string given, if
-/// one exists
-///
-/// Call this to find out if a string has already been interned, without newly
-/// interning it if not.
-#[inline]
-pub fn get_interned(s: &str) -> Option<IStr> {
-  crate::internal::THE_INTERNER.get_interned(s)
-}
-
 /// Create a collection of all the currently interned strings
 ///
 /// The order of the items in the collection may not be stable.
@@ -51,7 +27,31 @@ pub fn collect_interned_strings<B>() -> B
 where
   B: ::core::iter::FromIterator<IStr>,
 {
-  crate::internal::THE_INTERNER.collect_interned_strings()
+  crate::interner::THE_INTERNER.collect_interned_strings()
+}
+
+// # constructors
+
+macro_rules! intern_doc {() => {
+r"Intern a new string, or return the extant [`IStr`] if one exists
+
+This operation may be slow, depending on whether the string has been previously
+interned."
+};}
+#[doc = intern_doc!()]
+#[inline]
+pub fn intern(s: &str) -> IStr {
+  crate::interner::THE_INTERNER.intern(s)
+}
+
+/// Locklessly find an extant [`IStr`] corresponding to the string given, if
+/// one exists
+///
+/// Call this to find out if a string has already been interned, without newly
+/// interning it if not.
+#[inline]
+pub fn get_interned(s: &str) -> Option<IStr> {
+  crate::interner::THE_INTERNER.get_interned(s)
 }
 
 impl IStr {
@@ -348,7 +348,7 @@ impl IStr {
   /// [`IStr`] as a key in a [`hashbrown::HashTable`].
   #[inline]
   pub fn wyhash(&self) -> u64 {
-    use crate::internal::SIZE_OF_WYHASH;
+    use crate::interner::SIZE_OF_WYHASH;
     // safety: the Interner caches the u64 wyhash in the 8 bytes preceding the
     // string data
     let hash_array: &[u8; SIZE_OF_WYHASH] = unsafe {

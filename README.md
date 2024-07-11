@@ -4,21 +4,21 @@
 [docs.rs](https://docs.rs/sinter) |
 [github](https://github.com/ickk/sinter)
 
-This crate exposes an interned string type, [`IStr`], through a fast
-thread-safe global interning pool.
+An easy to use & fast global interning pool.
 
-Interned strings are stored contiguously* in memory, which may help with memory
-locality and fragmentation in some circumstances. *Additional pages of memory
-for the interned strings are allocated as required, doubling in size with each
-successive page to amortise the cost of the underlying allocations.
+Interned strings are stored contiguously in memory, which may help with memory
+locality or fragmentation. Additional pages of memory for the interner are
+allocated as required, doubling in size with each successive page - amortising
+the cost of the underlying allocations.
 
 Calling [`intern`] on a string that has already previously been interned is
-fast (& lockless), though still more expensive than holding onto and re-using
-an extant [`IStr`].
+fast & lockless, though still potentially more expensive than holding onto an
+[`IStr`] you already have.
 
-In the worst case [`intern`] can be somewhat expensive, since if the string
-doesn't already exist in the pool some synchronisation with other threads is
-required, and may require allocating a new memory page for the pool.
+In the worst case a call to [`intern`] can be relatively expensive, since if
+the string doesn't already exist then some synchronisation with other threads
+is required, and the operation may also require allocating a new memory page
+for the pool.
 
 `IStr`
 ------
@@ -116,12 +116,11 @@ let val = map.get("e");
 Architecture
 ------------
 
-Internally, a data structure known as the `Interner` manages the pool of
-interned strings.
+Internally, an `Interner` data structure manages the pool of interned strings.
 
-When writing a new string to the pool, the Interner acquires a lock on part of
-the backing store. This could be a somewhat slow operation if there is a lot of
-contention with other threads (although it would be unlikely).
+When adding a new string to the pool, the Interner acquires a lock on one half
+of the pool. This could be a somewhat slow operation if there is a lot of
+contention with other threads (although this should normally be very unlikely).
 
 On the other hand, the Interner uses lockless concurrency primitives to enable
 readers (callers to `intern` that do not require allocating a new string, and
@@ -137,13 +136,12 @@ The concurrency scheme is as follows:
 
 2. We maintain a pair of redundant hash tables mapping a string's hash to the
    `IStr` (the pointer to the string data in the memory page), facilitating
-   ~O(1) algorithmic complexity for interning strings. The tables are
-   atomically swapped by the writer, allowing readers to safely get new updates
-   without locking.
+   fast lookup for already interned strings. The tables are atomically swapped
+   by the writer, allowing readers to safely get new updates without locking.
 
    When a thread wants to inspect the "readable table" they increment an atomic
-   counter. They increment this counter again when they are done reading. This
-   allows the writer to reliably wait on lingering reads after the atomic table
+   counter. This counter is incremented again when the reader is finished. This
+   allows a writer to reliably wait on lingering reads after the atomic table
    swap.
 
    If each thread's counter is even, then the writer knows they are not reading
@@ -155,16 +153,15 @@ The concurrency scheme is as follows:
 
 3. When a thread terminates it calls the destructor for the `LocalKey` which
    contains a pointer to our epoch atomic-counter. In this destructor we set
-   the value of the epoch to a special value (`0`) to mark this thread as dead.
-   Later when some other code is holding the write_lock on the interner, it
-   checks the list of epochs to see if any threads are dead, and then frees the
-   memory holding the atomic and removes that epoch from Interner's list.
+   the value of the epoch to a special value to mark this thread as dead. Later
+   when some other code is holding the write_lock on the interner, it checks
+   the list of epochs to see if any threads are dead, and then frees the memory
+   holding the atomic and removes that epoch from Interner's list.
 
-   This solves the small memory leak and degradation of performance that can
-   happen if the user keeps spawning lots of temporary threads, without
-   requiring that the LocalKey destructor waits until it can get the
-   write_lock, and without leaving any dangling pointers in the Interner
-   datastructure.
+   This solves the small memory leak that might occur if the user keeps
+   spawning lots of temporary threads. It doesn't require that the LocalKey
+   destructor waits until it can get the write_lock, and it avoids accumulating
+   dangling pointers in the Interner datastructure.
 
 License
 -------
